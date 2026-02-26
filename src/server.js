@@ -17,6 +17,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
 
     if (req.method === 'GET' && url.pathname === '/') return serveFile('index.html', res);
+    if (req.method === 'GET' && url.pathname === '/healthz') return sendJson(res, 200, { ok: true });
     if (req.method === 'GET' && url.pathname.startsWith('/api/events/')) return sse(url.pathname.split('/').pop(), req, res);
     if (req.method === 'GET' && url.pathname.startsWith('/api/status/')) return status(url.pathname.split('/').pop(), res);
     if (req.method === 'POST' && url.pathname === '/api/start') return start(req, res);
@@ -31,6 +32,21 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`Servidor web em http://localhost:${PORT}`);
 });
+
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+function shutdown(signal) {
+  for (const monitor of monitors.values()) {
+    clearInterval(monitor.timer);
+    for (const listener of monitor.listeners) listener.end();
+  }
+  server.close(() => {
+    console.log(`Servidor terminado com ${signal}`);
+    process.exit(0);
+  });
+}
 
 async function start(req, res) {
   const body = await parseJsonBody(req);
