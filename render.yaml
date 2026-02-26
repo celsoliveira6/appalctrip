@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: icligo-notifications
+    env: node
+    plan: starter
+    buildCommand: "echo 'No build step required'"
+    startCommand: "node src/server.js"
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
