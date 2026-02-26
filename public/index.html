@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Monitor iCLigo</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 760px; margin: 30px auto; padding: 0 16px; }
+      .card { border: 1px solid #ddd; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+      input { width: 100%; padding: 10px; margin: 8px 0; }
+      button { padding: 10px 14px; margin-right: 6px; }
+      #logs { background: #111; color: #0f0; min-height: 180px; padding: 10px; border-radius: 8px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <h1>Website de Monitorização iCLigo</h1>
+    <div class="card">
+      <label>Username</label>
+      <input id="username" type="text" autocomplete="username" />
+      <label>Password</label>
+      <input id="password" type="password" autocomplete="current-password" />
+      <label>Intervalo (segundos, mínimo 30)</label>
+      <input id="interval" type="number" value="60" min="30" />
+      <button id="startBtn">Iniciar monitorização</button>
+      <button id="stopBtn" disabled>Parar</button>
+      <p id="status">Estado: parado</p>
+    </div>
+
+    <div class="card">
+      <h3>Eventos</h3>
+      <div id="logs"></div>
+    </div>
+
+    <script>
+      let monitorId = null;
+      let source = null;
+
+      const statusEl = document.getElementById('status');
+      const logsEl = document.getElementById('logs');
+      const startBtn = document.getElementById('startBtn');
+      const stopBtn = document.getElementById('stopBtn');
+
+      function log(message) {
+        logsEl.textContent += `[${new Date().toLocaleTimeString()}] ${message}\n`;
+        logsEl.scrollTop = logsEl.scrollHeight;
+      }
+
+      async function ensureBrowserNotificationPermission() {
+        if (!('Notification' in window)) return;
+        if (Notification.permission === 'default') {
+          await Notification.requestPermission();
+        }
+      }
+
+      function showBrowserNotification(title, body) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(title, { body });
+        }
+      }
+
+      startBtn.onclick = async () => {
+        await ensureBrowserNotificationPermission();
+
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const intervalSeconds = Number(document.getElementById('interval').value || 60);
+
+        const response = await fetch('/api/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, intervalSeconds })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          statusEl.textContent = `Erro: ${data.error}`;
+          log(`Erro ao iniciar: ${data.error}`);
+          return;
+        }
+
+        monitorId = data.id;
+        statusEl.textContent = `Estado: ativo (id ${monitorId.slice(0, 8)}...)`;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        log('Monitorização iniciada com sucesso.');
+
+        source = new EventSource(`/api/events/${monitorId}`);
+        source.onmessage = (event) => {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'new_notification') {
+            showBrowserNotification(payload.title, payload.message);
+            log(`🔔 ${payload.message}`);
+          } else if (payload.type === 'error') {
+            log(`❌ Erro: ${payload.message}`);
+          } else if (payload.type === 'heartbeat') {
+            log(`✔ Verificação sem alterações (${payload.lastCheckAt})`);
+          } else {
+            log(`ℹ ${payload.type}`);
+          }
+        };
+      };
+
+      stopBtn.onclick = async () => {
+        if (!monitorId) return;
+        await fetch(`/api/stop/${monitorId}`, { method: 'POST' });
+        if (source) source.close();
+        source = null;
+        monitorId = null;
+        statusEl.textContent = 'Estado: parado';
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        log('Monitorização parada.');
+      };
+    </script>
+  </body>
+</html>

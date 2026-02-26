@@ -1,22 +1,22 @@
-# ICLigo Notifications (Android)
+# iCLigo Notifications - Website
 
-Aplicação Android em Kotlin que faz login com username/password no site `myoffice.icligo.com` e monitoriza a página de notificações.
+Este projeto foi convertido para **website** (em vez de app Android).
 
-## Como funciona
-- Guarda `username` e `password` localmente (SharedPreferences).
-- Agenda um `WorkManager` periódico (mínimo Android: 15 minutos).
-- Em cada execução:
-  - abre a página de login,
-  - envia o formulário de autenticação,
-  - lê `https://myoffice.icligo.com/account/notifications`,
-  - calcula uma fingerprint SHA-256 do conteúdo,
-  - se mudou em relação à execução anterior, envia notificação no telemóvel.
+## O que faz
+- Permite inserir `username` e `password` do portal `https://myoffice.icligo.com`.
+- Faz login no portal e lê `https://myoffice.icligo.com/account/notifications`.
+- Compara o conteúdo periodicamente por fingerprint (SHA-256).
+- Quando há alteração, envia evento em tempo real para o browser e mostra notificação do navegador (se autorizada).
 
-## Limitações
-- O intervalo mínimo nativo de `WorkManager` para tarefa periódica é 15 minutos.
-- Se o site mudar os nomes dos campos de login de forma não-detectável automaticamente, pode ser necessário ajustar `SiteNotificationsScraper.kt`.
-
-## Build
+## Como executar
 ```bash
-./gradlew assembleDebug
+npm install
+npm start
 ```
+
+Depois abrir: `http://localhost:3000`
+
+## Observações
+- O monitor fica ativo enquanto o servidor Node estiver a correr.
+- Cada sessão de monitorização fica em memória do servidor.
+- Se o portal mudar o formulário de login, pode ser necessário ajustar `src/icligoClient.js`.
